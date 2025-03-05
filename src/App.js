@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
 
@@ -117,7 +117,7 @@ function App() {
         let message = '';
         if (phValue < settings.phMin) message = 'pH Air terlalu asam!';
         else if (phValue > settings.phMax) message = 'pH Air terlalu basa!';
-        if (tdsValue > settings.tdsMax) message += (message ? ' dan ' : '') + 'TDS Air terlalu tinggi!';
+        if (tdsValue > settings.tdsMax) message = `${message ? message + ' dan ' : ''}TDS Air terlalu tinggi!`;
         setNotificationMessage(message);
         setShowNotification(true);
 
@@ -150,7 +150,7 @@ function App() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [settings, handleExportData, phValue, tdsValue]);
+  }, [settings, handleExportData, phValue, tdsValue, historicalData, stats]);
 
   const getPhStatus = (ph) => {
     if (ph < 6.5) return { text: 'Asam', color: 'text-red-500', gradient: 'from-red-500 to-red-600' };
@@ -259,7 +259,7 @@ function App() {
     setDevices(devices.map((device) => (device.id === deviceId ? { ...device, status: device.status === 'active' ? 'inactive' : 'active' } : device)));
   };
 
-  const handleExportData = () => {
+  const handleExportData = useCallback(() => {
     const data = {
       timestamp: new Date().toISOString(),
       ph: historicalData.ph,
@@ -277,7 +277,7 @@ function App() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  };
+  }, [historicalData, stats]);
 
   const handleSettingsChange = (key, value) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
