@@ -124,7 +124,7 @@ function App() {
         if (phValue < settings.phMin) message = 'pH Air terlalu asam!';
         else if (phValue > settings.phMax) message = 'pH Air terlalu basa!';
         if (tdsValue > settings.tdsMax) {
-          message = message ? message + ' dan TDS Air terlalu tinggi!' : 'TDS Air terlalu tinggi!';
+          message = message ? `${message} dan TDS Air terlalu tinggi!` : 'TDS Air terlalu tinggi!';
         }
         setNotificationMessage(message);
         setShowNotification(true);
