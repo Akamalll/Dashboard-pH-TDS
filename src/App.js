@@ -303,51 +303,63 @@ function App() {
   };
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'dark' : ''}`}>
-      <div className="p-4 md:p-6 lg:p-8 dark:bg-gray-900">
+    <div className={`min-h-screen ${isDarkMode ? 'dark bg-gray-900' : 'bg-gradient-to-br from-blue-50 to-white'}`}>
+      <div className="container mx-auto p-4 md:p-6 lg:p-8">
         {/* Header */}
-        <header className="flex flex-col md:flex-row justify-between items-center mb-6">
-          <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-800 dark:text-white mb-4 md:mb-0">Dashboard Monitoring Kualitas Air</h1>
+        <header className="flex flex-col md:flex-row justify-between items-center mb-8 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 transition-all duration-300">
+          <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4 md:mb-0">Dashboard Monitoring Kualitas Air</h1>
           <div className="flex items-center space-x-4">
-            <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600">
+            <button
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className="p-3 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105"
+            >
               {isDarkMode ? '🌞' : '🌙'}
             </button>
-            <button onClick={() => setShowSettingsModal(true)} className="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600">
+            <button
+              onClick={() => setShowSettingsModal(true)}
+              className="px-6 py-3 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105"
+            >
               ⚙️ Pengaturan
             </button>
           </div>
         </header>
 
         {/* Main Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {/* pH Card */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-            <h2 className="text-xl font-semibold mb-4 dark:text-white">Nilai pH</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02]">
+            <h2 className="text-xl font-semibold mb-4 dark:text-white flex items-center">
+              <span className="mr-2">🧪</span> Nilai pH
+            </h2>
             <div className="flex flex-col items-center">
-              <div className={`text-4xl font-bold mb-2 ${phStatus.color}`}>{phValue.toFixed(1)}</div>
-              <div className={`text-lg ${phStatus.color}`}>{phStatus.text}</div>
+              <div className={`text-5xl font-bold mb-3 ${phStatus.color}`}>{phValue.toFixed(1)}</div>
+              <div className={`text-lg ${phStatus.color} px-4 py-1 rounded-full bg-opacity-10 ${phStatus.color.replace('text', 'bg')}`}>{phStatus.text}</div>
             </div>
           </div>
 
           {/* TDS Card */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-            <h2 className="text-xl font-semibold mb-4 dark:text-white">TDS (ppm)</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02]">
+            <h2 className="text-xl font-semibold mb-4 dark:text-white flex items-center">
+              <span className="mr-2">💧</span> TDS (ppm)
+            </h2>
             <div className="flex flex-col items-center">
-              <div className={`text-4xl font-bold mb-2 ${tdsStatus.color}`}>{Math.round(tdsValue)}</div>
-              <div className={`text-lg ${tdsStatus.color}`}>{tdsStatus.text}</div>
+              <div className={`text-5xl font-bold mb-3 ${tdsStatus.color}`}>{Math.round(tdsValue)}</div>
+              <div className={`text-lg ${tdsStatus.color} px-4 py-1 rounded-full bg-opacity-10 ${tdsStatus.color.replace('text', 'bg')}`}>{tdsStatus.text}</div>
             </div>
           </div>
 
           {/* Stats Card */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-            <h2 className="text-xl font-semibold mb-4 dark:text-white">Statistik</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02]">
+            <h2 className="text-xl font-semibold mb-4 dark:text-white flex items-center">
+              <span className="mr-2">📊</span> Statistik
+            </h2>
             <div className="space-y-4">
-              <div>
-                <p className="text-gray-600 dark:text-gray-400">pH Rata-rata</p>
+              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-xl">
+                <p className="text-gray-600 dark:text-gray-400 text-sm mb-1">pH Rata-rata</p>
                 <p className="text-2xl font-semibold dark:text-white">{stats.phAvg.toFixed(1)}</p>
               </div>
-              <div>
-                <p className="text-gray-600 dark:text-gray-400">TDS Rata-rata</p>
+              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-xl">
+                <p className="text-gray-600 dark:text-gray-400 text-sm mb-1">TDS Rata-rata</p>
                 <p className="text-2xl font-semibold dark:text-white">{Math.round(stats.tdsAvg)} ppm</p>
               </div>
             </div>
@@ -355,38 +367,85 @@ function App() {
         </div>
 
         {/* Chart Section */}
-        <div className="mt-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-          <Line options={chartOptions} data={chartData} className="w-full h-[300px] md:h-[400px]" />
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 mb-8 transition-all duration-300 hover:shadow-xl">
+          <Line
+            options={{
+              ...chartOptions,
+              plugins: {
+                ...chartOptions.plugins,
+                title: {
+                  ...chartOptions.plugins.title,
+                  font: {
+                    size: 16,
+                    weight: 'bold',
+                  },
+                  color: isDarkMode ? '#fff' : '#1f2937',
+                },
+                legend: {
+                  ...chartOptions.plugins.legend,
+                  labels: {
+                    color: isDarkMode ? '#fff' : '#1f2937',
+                    font: {
+                      size: 12,
+                    },
+                  },
+                },
+              },
+              scales: {
+                y: {
+                  ...chartOptions.scales.y,
+                  grid: {
+                    color: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+                  },
+                  ticks: {
+                    color: isDarkMode ? '#fff' : '#1f2937',
+                  },
+                },
+                x: {
+                  grid: {
+                    color: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+                  },
+                  ticks: {
+                    color: isDarkMode ? '#fff' : '#1f2937',
+                  },
+                },
+              },
+            }}
+            data={chartData}
+            className="w-full h-[300px] md:h-[400px]"
+          />
         </div>
 
         {/* Devices Section */}
-        <div className="mt-6">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
-            <h2 className="text-xl font-semibold dark:text-white mb-4 md:mb-0">Perangkat Terpasang</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 mb-8">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+            <h2 className="text-xl font-semibold dark:text-white mb-4 md:mb-0 flex items-center">
+              <span className="mr-2">🔌</span> Perangkat Terpasang
+            </h2>
             <button
               onClick={() => {
                 setEditingDevice(null);
                 setNewDevice({ name: '', type: 'pH', location: '' });
                 setShowDeviceModal(true);
               }}
-              className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+              className="px-6 py-3 rounded-full bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105"
             >
               + Tambah Perangkat
             </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {devices.map((device) => (
-              <div key={device.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+              <div key={device.id} className="bg-gray-50 dark:bg-gray-700 rounded-xl shadow-md p-6 transition-all duration-300 hover:shadow-lg transform hover:scale-[1.02]">
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <h3 className="text-lg font-semibold dark:text-white">{device.name}</h3>
                     <p className="text-gray-600 dark:text-gray-400">{device.location}</p>
                   </div>
                   <div className="flex space-x-2">
-                    <button onClick={() => handleEditDevice(device)} className="p-2 text-blue-500 hover:text-blue-600">
+                    <button onClick={() => handleEditDevice(device)} className="p-2 text-blue-500 hover:text-blue-600 transition-colors">
                       ✏️
                     </button>
-                    <button onClick={() => handleDeleteDevice(device.id)} className="p-2 text-red-500 hover:text-red-600">
+                    <button onClick={() => handleDeleteDevice(device.id)} className="p-2 text-red-500 hover:text-red-600 transition-colors">
                       🗑️
                     </button>
                   </div>
@@ -395,9 +454,13 @@ function App() {
                   <span className="text-sm text-gray-600 dark:text-gray-400">{device.type}</span>
                   <button
                     onClick={() => toggleDeviceStatus(device.id)}
-                    className={`px-3 py-1 rounded-full text-sm ${device.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}
+                    className={`px-4 py-2 rounded-full text-sm transition-all duration-300 ${
+                      device.status === 'active'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800'
+                        : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:bg-red-200 dark:hover:bg-red-800'
+                    }`}
                   >
-                    {device.status === 'active' ? 'Aktif' : 'Nonaktif'}
+                    {device.status === 'active' ? '🟢 Aktif' : '🔴 Nonaktif'}
                   </button>
                 </div>
               </div>
@@ -406,24 +469,26 @@ function App() {
         </div>
 
         {/* Last Update */}
-        <div className="mt-6 text-center text-gray-600 dark:text-gray-400">Pembaruan terakhir: {lastUpdate.toLocaleTimeString('id-ID')}</div>
+        <div className="text-center text-gray-600 dark:text-gray-400 mb-8">Pembaruan terakhir: {lastUpdate.toLocaleTimeString('id-ID')}</div>
 
         {/* Notification */}
-        {showNotification && <div className="fixed bottom-4 right-4 max-w-md bg-red-500 text-white px-6 py-4 rounded-lg shadow-lg">{notificationMessage}</div>}
+        {showNotification && <div className="fixed bottom-4 right-4 max-w-md bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-4 rounded-xl shadow-lg animate-slide-in">⚠️ {notificationMessage}</div>}
 
         {/* Settings Modal */}
         {showSettingsModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 w-full max-w-md">
-              <h2 className="text-xl font-semibold mb-4 dark:text-white">Pengaturan</h2>
-              <div className="space-y-4">
+          <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 w-full max-w-md transform transition-all duration-300 scale-100">
+              <h2 className="text-2xl font-semibold mb-6 dark:text-white flex items-center">
+                <span className="mr-2">⚙️</span> Pengaturan
+              </h2>
+              <div className="space-y-6">
                 <div>
                   <label className="block text-gray-700 dark:text-gray-300 mb-2">pH Minimum</label>
                   <input
                     type="number"
                     value={settings.phMin}
                     onChange={(e) => handleSettingsChange('phMin', parseFloat(e.target.value))}
-                    className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 transition-all duration-300"
                   />
                 </div>
                 <div>
@@ -432,7 +497,7 @@ function App() {
                     type="number"
                     value={settings.phMax}
                     onChange={(e) => handleSettingsChange('phMax', parseFloat(e.target.value))}
-                    className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 transition-all duration-300"
                   />
                 </div>
                 <div>
@@ -441,21 +506,26 @@ function App() {
                     type="number"
                     value={settings.tdsMax}
                     onChange={(e) => handleSettingsChange('tdsMax', parseInt(e.target.value))}
-                    className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 transition-all duration-300"
                   />
                 </div>
-                <div className="flex items-center">
-                  <input type="checkbox" checked={settings.notificationSound} onChange={(e) => handleSettingsChange('notificationSound', e.target.checked)} className="mr-2" />
-                  <label className="text-gray-700 dark:text-gray-300">Suara Notifikasi</label>
+                <div className="flex items-center bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                  <input
+                    type="checkbox"
+                    checked={settings.notificationSound}
+                    onChange={(e) => handleSettingsChange('notificationSound', e.target.checked)}
+                    className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 transition-all duration-300"
+                  />
+                  <label className="ml-3 text-gray-700 dark:text-gray-300">Suara Notifikasi</label>
                 </div>
-                <div>
-                  <label className="block text-gray-700 dark:text-gray-300 mb-2">Auto Export</label>
+                <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                  <label className="block text-gray-700 dark:text-gray-300 mb-3">Auto Export</label>
                   <div className="flex items-center space-x-4">
-                    <input type="checkbox" checked={settings.autoExport} onChange={(e) => handleSettingsChange('autoExport', e.target.checked)} className="mr-2" />
+                    <input type="checkbox" checked={settings.autoExport} onChange={(e) => handleSettingsChange('autoExport', e.target.checked)} className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 transition-all duration-300" />
                     <select
                       value={settings.exportInterval}
                       onChange={(e) => handleSettingsChange('exportInterval', e.target.value)}
-                      className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                      className="flex-1 px-4 py-2 border rounded-lg dark:bg-gray-600 dark:border-gray-500 dark:text-white focus:ring-2 focus:ring-blue-500 transition-all duration-300"
                       disabled={!settings.autoExport}
                     >
                       <option value="daily">Harian</option>
@@ -465,11 +535,11 @@ function App() {
                   </div>
                 </div>
               </div>
-              <div className="mt-6 flex justify-end space-x-4">
-                <button onClick={() => setShowSettingsModal(false)} className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
+              <div className="mt-8 flex justify-end space-x-4">
+                <button onClick={() => setShowSettingsModal(false)} className="px-6 py-2 rounded-full bg-gray-500 text-white hover:bg-gray-600 transition-all duration-300 transform hover:scale-105">
                   Tutup
                 </button>
-                <button onClick={handleExportData} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+                <button onClick={handleExportData} className="px-6 py-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105">
                   Export Data
                 </button>
               </div>
@@ -479,17 +549,20 @@ function App() {
 
         {/* Device Modal */}
         {showDeviceModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 w-full max-w-md">
-              <h2 className="text-xl font-semibold mb-4 dark:text-white">{editingDevice ? 'Edit Perangkat' : 'Tambah Perangkat'}</h2>
-              <div className="space-y-4">
+          <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 w-full max-w-md transform transition-all duration-300 scale-100">
+              <h2 className="text-2xl font-semibold mb-6 dark:text-white flex items-center">
+                <span className="mr-2">{editingDevice ? '✏️' : '➕'}</span>
+                {editingDevice ? 'Edit Perangkat' : 'Tambah Perangkat'}
+              </h2>
+              <div className="space-y-6">
                 <div>
                   <label className="block text-gray-700 dark:text-gray-300 mb-2">Nama Perangkat</label>
                   <input
                     type="text"
                     value={editingDevice ? editingDevice.name : newDevice.name}
                     onChange={(e) => (editingDevice ? setEditingDevice({ ...editingDevice, name: e.target.value }) : setNewDevice({ ...newDevice, name: e.target.value }))}
-                    className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 transition-all duration-300"
                   />
                 </div>
                 <div>
@@ -497,7 +570,7 @@ function App() {
                   <select
                     value={editingDevice ? editingDevice.type : newDevice.type}
                     onChange={(e) => (editingDevice ? setEditingDevice({ ...editingDevice, type: e.target.value }) : setNewDevice({ ...newDevice, type: e.target.value }))}
-                    className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 transition-all duration-300"
                   >
                     <option value="pH">pH</option>
                     <option value="TDS">TDS</option>
@@ -509,15 +582,18 @@ function App() {
                     type="text"
                     value={editingDevice ? editingDevice.location : newDevice.location}
                     onChange={(e) => (editingDevice ? setEditingDevice({ ...editingDevice, location: e.target.value }) : setNewDevice({ ...newDevice, location: e.target.value }))}
-                    className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 transition-all duration-300"
                   />
                 </div>
               </div>
-              <div className="mt-6 flex justify-end space-x-4">
-                <button onClick={() => setShowDeviceModal(false)} className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
+              <div className="mt-8 flex justify-end space-x-4">
+                <button onClick={() => setShowDeviceModal(false)} className="px-6 py-2 rounded-full bg-gray-500 text-white hover:bg-gray-600 transition-all duration-300 transform hover:scale-105">
                   Batal
                 </button>
-                <button onClick={editingDevice ? handleUpdateDevice : handleAddDevice} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+                <button
+                  onClick={editingDevice ? handleUpdateDevice : handleAddDevice}
+                  className="px-6 py-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105"
+                >
                   {editingDevice ? 'Simpan' : 'Tambah'}
                 </button>
               </div>
@@ -527,15 +603,17 @@ function App() {
 
         {/* Delete Confirmation Modal */}
         {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 w-full max-w-md">
-              <h2 className="text-xl font-semibold mb-4 dark:text-white">Konfirmasi Hapus</h2>
-              <p className="text-gray-600 dark:text-gray-400">Apakah Anda yakin ingin menghapus perangkat ini?</p>
-              <div className="mt-6 flex justify-end space-x-4">
-                <button onClick={cancelDeleteDevice} className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
+          <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 w-full max-w-md transform transition-all duration-300 scale-100">
+              <h2 className="text-2xl font-semibold mb-4 dark:text-white flex items-center">
+                <span className="mr-2">🗑️</span> Konfirmasi Hapus
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">Apakah Anda yakin ingin menghapus perangkat ini?</p>
+              <div className="flex justify-end space-x-4">
+                <button onClick={cancelDeleteDevice} className="px-6 py-2 rounded-full bg-gray-500 text-white hover:bg-gray-600 transition-all duration-300 transform hover:scale-105">
                   Batal
                 </button>
-                <button onClick={confirmDeleteDevice} className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">
+                <button onClick={confirmDeleteDevice} className="px-6 py-2 rounded-full bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700 transition-all duration-300 transform hover:scale-105">
                   Hapus
                 </button>
               </div>
