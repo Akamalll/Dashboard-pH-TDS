@@ -85,39 +85,47 @@ function App() {
 
     const interval = setInterval(() => {
       // Simulasi perubahan nilai pH (antara 6.5 - 8.5)
-      setPhValue((prev) => {
+      setPhValue((prevPh) => {
         const change = (Math.random() - 0.5) * 0.2;
-        const newValue = prev + change;
-        return Math.min(Math.max(newValue, 6.5), 8.5);
+        const newValue = prevPh + change;
+        const finalValue = Math.min(Math.max(newValue, 6.5), 8.5);
+
+        setHistoricalData((prev) => ({
+          ...prev,
+          ph: [...prev.ph.slice(1), finalValue],
+        }));
+
+        return finalValue;
       });
 
       // Simulasi perubahan nilai TDS (antara 0 - 1000 ppm)
-      setTdsValue((prev) => {
+      setTdsValue((prevTds) => {
         const change = (Math.random() - 0.5) * 50;
-        const newValue = prev + change;
-        return Math.min(Math.max(newValue, 0), 1000);
+        const newValue = prevTds + change;
+        const finalValue = Math.min(Math.max(newValue, 0), 1000);
+
+        setHistoricalData((prev) => ({
+          ...prev,
+          tds: [...prev.tds.slice(1), finalValue],
+        }));
+
+        setStats((prev) => ({
+          phAvg: (prev.phAvg * 23 + finalValue) / 24,
+          tdsAvg: (prev.tdsAvg * 23 + finalValue) / 24,
+          normalTime: prev.normalTime,
+        }));
+
+        return finalValue;
       });
-
-      // Update data historis
-      setHistoricalData((prev) => ({
-        ...prev,
-        ph: [...prev.ph.slice(1), phValue],
-        tds: [...prev.tds.slice(1), tdsValue],
-      }));
-
-      // Update statistik
-      setStats((prev) => ({
-        phAvg: (prev.phAvg * 23 + phValue) / 24,
-        tdsAvg: (prev.tdsAvg * 23 + tdsValue) / 24,
-        normalTime: prev.normalTime,
-      }));
 
       // Cek notifikasi dengan threshold yang disesuaikan
       if (phValue < settings.phMin || phValue > settings.phMax || tdsValue > settings.tdsMax) {
         let message = '';
         if (phValue < settings.phMin) message = 'pH Air terlalu asam!';
         else if (phValue > settings.phMax) message = 'pH Air terlalu basa!';
-        if (tdsValue > settings.tdsMax) message = `${message ? message + ' dan ' : ''}TDS Air terlalu tinggi!`;
+        if (tdsValue > settings.tdsMax) {
+          message = message ? message + ' dan TDS Air terlalu tinggi!' : 'TDS Air terlalu tinggi!';
+        }
         setNotificationMessage(message);
         setShowNotification(true);
 
