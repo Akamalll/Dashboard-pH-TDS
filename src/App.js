@@ -60,6 +60,26 @@ function App() {
   const phValueRef = useRef(phValue);
   const tdsValueRef = useRef(tdsValue);
 
+  const handleExportData = useCallback(() => {
+    const data = {
+      timestamp: new Date().toISOString(),
+      ph: historicalData.ph,
+      tds: historicalData.tds,
+      labels: historicalData.labels,
+      stats: stats,
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `water-quality-data-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [historicalData, stats]);
+
   // Sinkronisasi darkMode ke localStorage
   useEffect(() => {
     localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
@@ -277,26 +297,6 @@ function App() {
   const toggleDeviceStatus = (deviceId) => {
     setDevices(devices.map((device) => (device.id === deviceId ? { ...device, status: device.status === 'active' ? 'inactive' : 'active' } : device)));
   };
-
-  const handleExportData = useCallback(() => {
-    const data = {
-      timestamp: new Date().toISOString(),
-      ph: historicalData.ph,
-      tds: historicalData.tds,
-      labels: historicalData.labels,
-      stats: stats,
-    };
-
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `water-quality-data-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, [historicalData, stats]);
 
   const handleSettingsChange = (key, value) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
