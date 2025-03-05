@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
 
@@ -57,6 +57,9 @@ function App() {
         };
   });
 
+  const phValueRef = useRef(phValue);
+  const tdsValueRef = useRef(tdsValue);
+
   // Sinkronisasi darkMode ke localStorage
   useEffect(() => {
     localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
@@ -71,6 +74,15 @@ function App() {
   useEffect(() => {
     localStorage.setItem('settings', JSON.stringify(settings));
   }, [settings]);
+
+  // Update refs when values change
+  useEffect(() => {
+    phValueRef.current = phValue;
+  }, [phValue]);
+
+  useEffect(() => {
+    tdsValueRef.current = tdsValue;
+  }, [tdsValue]);
 
   useEffect(() => {
     // Inisialisasi label waktu
@@ -119,14 +131,13 @@ function App() {
       });
 
       // Cek notifikasi dengan threshold yang disesuaikan
-      if (phValue < settings.phMin || phValue > settings.phMax || tdsValue > settings.tdsMax) {
-        let message = '';
-        if (phValue < settings.phMin) message = 'pH Air terlalu asam!';
-        else if (phValue > settings.phMax) message = 'pH Air terlalu basa!';
-        if (tdsValue > settings.tdsMax) {
-          message += message ? ' dan TDS Air terlalu tinggi!' : 'TDS Air terlalu tinggi!';
-        }
-        setNotificationMessage(message);
+      if (phValueRef.current < settings.phMin || phValueRef.current > settings.phMax || tdsValueRef.current > settings.tdsMax) {
+        const messages = [];
+        if (phValueRef.current < settings.phMin) messages.push('pH Air terlalu asam!');
+        else if (phValueRef.current > settings.phMax) messages.push('pH Air terlalu basa!');
+        if (tdsValueRef.current > settings.tdsMax) messages.push('TDS Air terlalu tinggi!');
+
+        setNotificationMessage(messages.join(' dan '));
         setShowNotification(true);
 
         // Play notification sound if enabled
