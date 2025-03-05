@@ -31,7 +31,7 @@ git clone https://github.com/akamalll/Dashboard-pH-TDS.git
 2. Masuk ke direktori proyek
 
 ```bash
-cd monitor-kualitas-air
+cd Dashboard-pH-TDS
 ```
 
 3. Install dependencies
