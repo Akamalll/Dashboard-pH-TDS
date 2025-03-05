@@ -1,21 +1,33 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Line } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
+import HeaderDashboard from './components/HeaderDashboard';
+import SettingsModal from './components/SettingsModal';
+import DevicesSection from './components/DevicesSection';
+import DeviceModal from './components/DeviceModal';
+import DeleteConfirmationModal from './components/DeleteConfirmationModal';
+import * as XLSX from 'xlsx';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
+// Register ChartJS components
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
 function App() {
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    return saved ? JSON.parse(saved) : false;
+    const savedMode = localStorage.getItem('darkMode');
+    return savedMode ? JSON.parse(savedMode) : true; // Default ke dark mode
   });
   const [phValue, setPhValue] = useState(7.0);
   const [tdsValue, setTdsValue] = useState(0);
   const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [timeRange, setTimeRange] = useState('24h');
   const [historicalData, setHistoricalData] = useState({
     ph: Array(24).fill(7.0),
     tds: Array(24).fill(0),
-    labels: Array(24).fill(''),
+    labels: Array.from({ length: 24 }, (_, i) => {
+      const d = new Date();
+      d.setHours(d.getHours() - (23 - i));
+      return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    }),
   });
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
@@ -29,8 +41,33 @@ function App() {
     return savedDevices
       ? JSON.parse(savedDevices)
       : [
-          { id: 1, name: 'Sensor pH', type: 'pH', status: 'active', location: 'Kolam 1' },
-          { id: 2, name: 'Sensor TDS', type: 'TDS', status: 'active', location: 'Kolam 1' },
+          {
+            id: 1,
+            name: 'Sensor pH',
+            type: 'pH',
+            status: 'active',
+            location: 'Kolam 1',
+            lastReading: 7.0,
+            lastUpdate: new Date().toISOString(),
+          },
+          {
+            id: 2,
+            name: 'Sensor TDS',
+            type: 'TDS',
+            status: 'active',
+            location: 'Kolam 1',
+            lastReading: 350,
+            lastUpdate: new Date().toISOString(),
+          },
+          {
+            id: 3,
+            name: 'Sensor Suhu',
+            type: 'Temperature',
+            status: 'active',
+            location: 'Kolam 2',
+            lastReading: 25,
+            lastUpdate: new Date().toISOString(),
+          },
         ];
   });
   const [showDeviceModal, setShowDeviceModal] = useState(false);
@@ -49,16 +86,35 @@ function App() {
       ? JSON.parse(savedSettings)
       : {
           phMin: 6.5,
-          phMax: 8.5,
-          tdsMax: 600,
+          phMax: 7.5,
+          tdsMin: 0,
+          tdsMax: 1000,
+          updateInterval: 5,
           notificationSound: true,
+          desktopNotification: true,
+          notificationInterval: 30,
           autoExport: false,
+          exportFormat: 'json',
           exportInterval: 'daily',
         };
   });
 
   const phValueRef = useRef(phValue);
   const tdsValueRef = useRef(tdsValue);
+
+  // Add deleteConfirmation state
+  const [deleteConfirmation, setDeleteConfirmation] = useState({
+    isOpen: false,
+    deviceId: null,
+    deviceName: '',
+  });
+
+  const [realTimeData, setRealTimeData] = useState({
+    ph: 7.0,
+    tds: 0,
+    temperature: 25,
+    do: 6.5,
+  });
 
   const handleExportData = useCallback(() => {
     const data = {
@@ -80,7 +136,7 @@ function App() {
     URL.revokeObjectURL(url);
   }, [historicalData, stats]);
 
-  // Sinkronisasi darkMode ke localStorage
+  // Effect untuk menyimpan preferensi dark mode
   useEffect(() => {
     localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
   }, [isDarkMode]);
@@ -103,6 +159,22 @@ function App() {
   useEffect(() => {
     tdsValueRef.current = tdsValue;
   }, [tdsValue]);
+
+  useEffect(() => {
+    // Minta izin notifikasi desktop saat aplikasi dimuat
+    if (settings.desktopNotification) {
+      Notification.requestPermission();
+    }
+  }, [settings.desktopNotification]);
+
+  const showDesktopNotification = (message) => {
+    if (settings.desktopNotification && Notification.permission === 'granted') {
+      new Notification('Peringatan Kualitas Air', {
+        body: message,
+        icon: '/favicon.ico',
+      });
+    }
+  };
 
   useEffect(() => {
     // Inisialisasi label waktu
@@ -157,7 +229,8 @@ function App() {
         else if (phValueRef.current > settings.phMax) messages.push('pH Air terlalu basa!');
         if (tdsValueRef.current > settings.tdsMax) messages.push('TDS Air terlalu tinggi!');
 
-        setNotificationMessage(messages.join(' dan '));
+        const notificationMessage = messages.join(' dan ');
+        setNotificationMessage(notificationMessage);
         setShowNotification(true);
 
         // Play notification sound if enabled
@@ -166,7 +239,10 @@ function App() {
           audio.play().catch(console.error);
         }
 
-        setTimeout(() => setShowNotification(false), 5000);
+        // Show desktop notification if enabled
+        showDesktopNotification(notificationMessage);
+
+        setTimeout(() => setShowNotification(false), settings.notificationInterval * 1000);
       }
 
       // Auto export if enabled
@@ -175,18 +251,23 @@ function App() {
         const lastExport = localStorage.getItem('lastExport');
         const shouldExport =
           !lastExport ||
+          (settings.exportInterval === 'hourly' && new Date(lastExport).getHours() !== now.getHours()) ||
           (settings.exportInterval === 'daily' && new Date(lastExport).getDate() !== now.getDate()) ||
           (settings.exportInterval === 'weekly' && new Date(lastExport).getTime() + 7 * 24 * 60 * 60 * 1000 < now.getTime()) ||
           (settings.exportInterval === 'monthly' && new Date(lastExport).getMonth() !== now.getMonth());
 
         if (shouldExport) {
-          handleExportData();
+          if (settings.exportFormat === 'csv') {
+            exportToCSV();
+          } else {
+            handleExportData();
+          }
           localStorage.setItem('lastExport', now.toISOString());
         }
       }
 
       setLastUpdate(new Date());
-    }, 5000);
+    }, settings.updateInterval * 1000);
 
     return () => clearInterval(interval);
   }, [settings, handleExportData]);
@@ -206,447 +287,403 @@ function App() {
   const phStatus = getPhStatus(phValue);
   const tdsStatus = getTdsStatus(tdsValue);
 
-  const chartOptions = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'top',
-      },
-      title: {
-        display: true,
-        text: 'Grafik Historis 24 Jam Terakhir',
-      },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-      },
-    },
-  };
-
   const chartData = {
     labels: historicalData.labels,
     datasets: [
       {
         label: 'pH',
         data: historicalData.ph,
-        borderColor: 'rgb(59, 130, 246)',
-        backgroundColor: 'rgba(59, 130, 246, 0.5)',
+        borderColor: 'rgb(37, 99, 235)',
+        backgroundColor: (context) => {
+          const ctx = context.chart.ctx;
+          const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+          gradient.addColorStop(0, 'rgba(37, 99, 235, 0.5)');
+          gradient.addColorStop(1, 'rgba(37, 99, 235, 0.0)');
+          return gradient;
+        },
+        borderWidth: 3,
+        pointRadius: 4,
+        pointBackgroundColor: 'rgb(37, 99, 235)',
+        pointBorderColor: '#fff',
+        pointHoverRadius: 8,
+        pointHoverBackgroundColor: 'rgb(37, 99, 235)',
+        pointHoverBorderColor: '#fff',
+        pointHoverBorderWidth: 4,
         tension: 0.4,
+        fill: true,
+        yAxisID: 'y',
       },
       {
         label: 'TDS (ppm)',
         data: historicalData.tds,
-        borderColor: 'rgb(16, 185, 129)',
-        backgroundColor: 'rgba(16, 185, 129, 0.5)',
+        borderColor: 'rgb(34, 197, 94)',
+        backgroundColor: (context) => {
+          const ctx = context.chart.ctx;
+          const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+          gradient.addColorStop(0, 'rgba(34, 197, 94, 0.5)');
+          gradient.addColorStop(1, 'rgba(34, 197, 94, 0.0)');
+          return gradient;
+        },
+        borderWidth: 3,
+        pointRadius: 4,
+        pointBackgroundColor: 'rgb(34, 197, 94)',
+        pointBorderColor: '#fff',
+        pointHoverRadius: 8,
+        pointHoverBackgroundColor: 'rgb(34, 197, 94)',
+        pointHoverBorderColor: '#fff',
+        pointHoverBorderWidth: 4,
         tension: 0.4,
+        fill: true,
+        yAxisID: 'y1',
       },
     ],
   };
 
-  const handleAddDevice = () => {
-    if (newDevice.name && newDevice.location) {
-      const device = {
-        id: devices.length + 1,
-        ...newDevice,
-        status: 'active',
-      };
-      setDevices([...devices, device]);
-      setNewDevice({ name: '', type: 'pH', location: '' });
-      setShowDeviceModal(false);
-    }
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+      mode: 'index',
+      intersect: false,
+    },
+    animations: {
+      tension: {
+        duration: 1000,
+        easing: 'linear',
+        from: 0.8,
+        to: 0.4,
+        loop: true,
+      },
+    },
+    plugins: {
+      legend: {
+        display: true,
+        position: 'top',
+        labels: {
+          usePointStyle: true,
+          pointStyle: 'circle',
+          padding: 20,
+          font: {
+            size: 12,
+            weight: 'bold',
+          },
+        },
+      },
+      tooltip: {
+        backgroundColor: isDarkMode ? 'rgba(17, 24, 39, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+        titleColor: isDarkMode ? '#fff' : '#111827',
+        bodyColor: isDarkMode ? '#fff' : '#111827',
+        padding: 12,
+        borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(17, 24, 39, 0.1)',
+        borderWidth: 1,
+        displayColors: true,
+        usePointStyle: true,
+        callbacks: {
+          label: (context) => {
+            const value = context.parsed.y;
+            if (context.dataset.yAxisID === 'y') {
+              return `pH: ${value.toFixed(1)}`;
+            }
+            return `TDS: ${value.toFixed(0)} ppm`;
+          },
+        },
+      },
+    },
+    scales: {
+      x: {
+        grid: {
+          display: false,
+        },
+        ticks: {
+          color: isDarkMode ? '#9CA3AF' : '#4B5563',
+          font: {
+            size: 10,
+            weight: '500',
+          },
+          maxRotation: 45,
+          minRotation: 45,
+        },
+      },
+      y: {
+        position: 'left',
+        grid: {
+          color: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(17, 24, 39, 0.05)',
+          drawBorder: false,
+        },
+        ticks: {
+          color: isDarkMode ? '#9CA3AF' : '#4B5563',
+          font: {
+            size: 10,
+            weight: '500',
+          },
+          callback: (value) => `${value.toFixed(1)} pH`,
+          padding: 8,
+        },
+        min: 0,
+        max: 14,
+        beginAtZero: true,
+      },
+      y1: {
+        position: 'right',
+        grid: {
+          display: false,
+        },
+        ticks: {
+          color: isDarkMode ? '#9CA3AF' : '#4B5563',
+          font: {
+            size: 10,
+            weight: '500',
+          },
+          callback: (value) => `${value} ppm`,
+          padding: 8,
+        },
+        beginAtZero: true,
+      },
+    },
+  };
+
+  const handleAddDevice = (deviceData) => {
+    const newDevice = {
+      id: Date.now(),
+      ...deviceData,
+      status: 'active',
+    };
+    setDevices([...devices, newDevice]);
+    setShowDeviceModal(false);
+    // Tampilkan notifikasi sukses
+    setNotificationMessage('Perangkat berhasil ditambahkan');
+    setShowNotification(true);
+    setTimeout(() => setShowNotification(false), 3000);
   };
 
   const handleEditDevice = (device) => {
     setEditingDevice(device);
-    setNewDevice({
-      name: device.name,
-      type: device.type,
-      location: device.location,
-    });
     setShowDeviceModal(true);
   };
 
-  const handleUpdateDevice = () => {
-    if (editingDevice && newDevice.name && newDevice.location) {
-      setDevices(devices.map((device) => (device.id === editingDevice.id ? { ...device, ...newDevice } : device)));
-      setEditingDevice(null);
-      setNewDevice({ name: '', type: 'pH', location: '' });
-      setShowDeviceModal(false);
-    }
+  const handleUpdateDevice = (updatedData) => {
+    setDevices(devices.map((device) => (device.id === editingDevice.id ? { ...device, ...updatedData } : device)));
+    setEditingDevice(null);
+    setShowDeviceModal(false);
+    // Tampilkan notifikasi sukses
+    setNotificationMessage('Perangkat berhasil diperbarui');
+    setShowNotification(true);
+    setTimeout(() => setShowNotification(false), 3000);
   };
 
-  const handleDeleteDevice = (deviceId) => {
-    setDeviceToDelete(deviceId);
-    setShowDeleteConfirm(true);
-  };
-
-  const confirmDeleteDevice = () => {
-    if (deviceToDelete) {
-      setDevices(devices.filter((device) => device.id !== deviceToDelete));
-      setShowDeleteConfirm(false);
-      setDeviceToDelete(null);
-    }
-  };
-
-  const cancelDeleteDevice = () => {
-    setShowDeleteConfirm(false);
-    setDeviceToDelete(null);
+  const handleDeleteDevice = (device) => {
+    setDevices(devices.filter((d) => d.id !== device.id));
+    // Tampilkan notifikasi sukses
+    setNotificationMessage('Perangkat berhasil dihapus');
+    setShowNotification(true);
+    setTimeout(() => setShowNotification(false), 3000);
   };
 
   const toggleDeviceStatus = (deviceId) => {
     setDevices(devices.map((device) => (device.id === deviceId ? { ...device, status: device.status === 'active' ? 'inactive' : 'active' } : device)));
   };
 
-  const handleSettingsChange = (key, value) => {
-    setSettings((prev) => ({ ...prev, [key]: value }));
+  const handleSaveSettings = useCallback((newSettings) => {
+    setSettings(newSettings);
+    setShowSettingsModal(false);
+    // Tampilkan notifikasi sukses
+    setNotificationMessage('Pengaturan berhasil disimpan');
+    setShowNotification(true);
+    setTimeout(() => setShowNotification(false), 3000);
+  }, []);
+
+  // Fungsi untuk toggle dark mode
+  const toggleDarkMode = () => {
+    setIsDarkMode(!isDarkMode);
   };
 
-  return (
-    <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'dark bg-gray-900 text-white' : 'bg-gradient-to-br from-blue-50 to-white text-gray-900'}`}>
-      <div className="container mx-auto p-4 md:p-6 lg:p-8">
-        {/* Header */}
-        <header className={`flex flex-col md:flex-row justify-between items-center mb-8 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-lg p-6 transition-all duration-300`}>
-          <h1 className={`text-2xl md:text-3xl lg:text-4xl font-bold ${isDarkMode ? 'text-white' : 'bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent'} mb-4 md:mb-0`}>Dashboard Monitoring Kualitas Air</h1>
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => setIsDarkMode(!isDarkMode)}
-              className={`p-3 rounded-full ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'} transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105`}
-            >
-              {isDarkMode ? '🌞' : '🌙'}
-            </button>
-            <button
-              onClick={() => setShowSettingsModal(true)}
-              className={`px-6 py-3 rounded-full ${
-                isDarkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700'
-              } text-white transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105`}
-            >
-              ⚙️ Pengaturan
-            </button>
-          </div>
-        </header>
+  // Fungsi untuk export data ke CSV
+  const exportToCSV = () => {
+    try {
+      // Persiapkan data untuk di-export
+      const data = historicalData.labels.map((time, index) => ({
+        Waktu: time,
+        pH: historicalData.ph[index].toFixed(1),
+        TDS: historicalData.tds[index],
+      }));
 
-        {/* Main Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+      // Buat header CSV
+      const headers = ['Waktu', 'pH', 'TDS'];
+
+      // Convert data ke format CSV
+      const csvContent = [
+        headers.join(','), // Header row
+        ...data.map((row) => [row.Waktu, row.pH, row.TDS].join(',')),
+      ].join('\n');
+
+      // Buat blob dan download file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const fileName = `monitoring_data_${new Date().toLocaleDateString().replace(/\//g, '-')}.csv`;
+
+      if (window.navigator.msSaveOrOpenBlob) {
+        // Untuk IE
+        window.navigator.msSaveOrOpenBlob(blob, fileName);
+      } else {
+        // Untuk browser lain
+        link.href = window.URL.createObjectURL(blob);
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      // Tampilkan notifikasi sukses
+      setNotificationMessage('Data berhasil diexport ke CSV');
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 3000);
+    } catch (error) {
+      console.error('Export error:', error);
+      setNotificationMessage('Gagal mengexport data');
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 3000);
+    }
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch('http://localhost:80/values');
+        const data = await response.json();
+        setRealTimeData({
+          ph: parseFloat(data.ph),
+          tds: parseFloat(data.tds),
+          temperature: parseFloat(data.temperature || 25),
+          do: parseFloat(data.do || 6.5),
+        });
+
+        // Update historical data
+        setHistoricalData((prev) => ({
+          ...prev,
+          ph: [...prev.ph.slice(1), data.ph],
+          tds: [...prev.tds.slice(1), data.tds],
+        }));
+
+        // Update stats
+        setStats((prev) => ({
+          phAvg: (prev.phAvg * 23 + data.ph) / 24,
+          tdsAvg: (prev.tdsAvg * 23 + data.tds) / 24,
+          normalTime: prev.normalTime,
+        }));
+
+        setLastUpdate(new Date());
+      } catch (error) {
+        console.error('Error fetching sensor data:', error);
+      }
+    };
+
+    const interval = setInterval(fetchData, 5000); // Fetch every 5 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className={`min-h-screen p-2 sm:p-4 md:p-6 lg:p-8 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'}`}>
+      <div className="max-w-7xl mx-auto">
+        <HeaderDashboard isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} setShowSettingsModal={setShowSettingsModal} lastUpdate={lastUpdate} />
+
+        {/* Main Grid Container */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
           {/* pH Card */}
-          <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-lg p-6 transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02]`}>
-            <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'} flex items-center`}>
-              <span className="mr-2">🧪</span> Nilai pH
-            </h2>
-            <div className="flex flex-col items-center">
-              <div className={`text-5xl font-bold mb-3 ${phStatus.color}`}>{phValue.toFixed(1)}</div>
-              <div className={`text-lg ${phStatus.color} px-4 py-1 rounded-full bg-opacity-20 ${phStatus.color.replace('text', 'bg')}`}>{phStatus.text}</div>
+          <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} p-4 rounded-2xl shadow-lg`}>
+            <h2 className="text-xl font-semibold mb-4">pH Air</h2>
+            <div className="flex flex-col space-y-4">
+              <div className={`text-4xl font-bold ${phStatus.color}`}>{phValue.toFixed(1)}</div>
+              <div className={`text-lg ${phStatus.color}`}>Status: {phStatus.text}</div>
             </div>
           </div>
 
           {/* TDS Card */}
-          <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-lg p-6 transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02]`}>
-            <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'} flex items-center`}>
-              <span className="mr-2">💧</span> TDS (ppm)
-            </h2>
-            <div className="flex flex-col items-center">
-              <div className={`text-5xl font-bold mb-3 ${tdsStatus.color}`}>{Math.round(tdsValue)}</div>
-              <div className={`text-lg ${tdsStatus.color} px-4 py-1 rounded-full bg-opacity-20 ${tdsStatus.color.replace('text', 'bg')}`}>{tdsStatus.text}</div>
+          <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} p-4 rounded-2xl shadow-lg`}>
+            <h2 className="text-xl font-semibold mb-4">TDS (PPM)</h2>
+            <div className="flex flex-col space-y-4">
+              <div className={`text-4xl font-bold ${tdsStatus.color}`}>{Math.round(tdsValue)}</div>
+              <div className={`text-lg ${tdsStatus.color}`}>Status: {tdsStatus.text}</div>
             </div>
           </div>
 
           {/* Stats Card */}
-          <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-lg p-6 transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02]`}>
-            <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'} flex items-center`}>
-              <span className="mr-2">📊</span> Statistik
-            </h2>
-            <div className="space-y-4">
-              <div className={`${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} p-4 rounded-xl`}>
-                <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} text-sm mb-1`}>pH Rata-rata</p>
-                <p className={`text-2xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{stats.phAvg.toFixed(1)}</p>
+          <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} p-4 rounded-2xl shadow-lg md:col-span-2 lg:col-span-1`}>
+            <h2 className="text-xl font-semibold mb-4">Statistik</h2>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Rata-rata pH</p>
+                <p className="text-2xl font-bold">{stats.phAvg.toFixed(1)}</p>
               </div>
-              <div className={`${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} p-4 rounded-xl`}>
-                <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} text-sm mb-1`}>TDS Rata-rata</p>
-                <p className={`text-2xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{Math.round(stats.tdsAvg)} ppm</p>
+              <div>
+                <p className="text-sm text-gray-500">Rata-rata TDS</p>
+                <p className="text-2xl font-bold">{Math.round(stats.tdsAvg)}</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Chart Section */}
-        <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-lg p-6 mb-8 transition-all duration-300 hover:shadow-xl`}>
-          <Line
-            options={{
-              ...chartOptions,
-              plugins: {
-                ...chartOptions.plugins,
-                title: {
-                  ...chartOptions.plugins.title,
-                  font: {
-                    size: 16,
-                    weight: 'bold',
-                  },
-                  color: isDarkMode ? '#fff' : '#1f2937',
-                },
-                legend: {
-                  ...chartOptions.plugins.legend,
-                  labels: {
-                    color: isDarkMode ? '#fff' : '#1f2937',
-                    font: {
-                      size: 12,
-                    },
-                  },
-                },
-              },
-              scales: {
-                y: {
-                  ...chartOptions.scales.y,
-                  grid: {
-                    color: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
-                  },
-                  ticks: {
-                    color: isDarkMode ? '#fff' : '#1f2937',
-                  },
-                },
-                x: {
-                  grid: {
-                    color: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
-                  },
-                  ticks: {
-                    color: isDarkMode ? '#fff' : '#1f2937',
-                  },
-                },
-              },
-            }}
-            data={chartData}
-            className="w-full h-[300px] md:h-[400px]"
-          />
+        {/* Charts Section */}
+        <div className="mb-8">
+          <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} p-4 rounded-2xl shadow-lg`}>
+            <h2 className="text-xl font-semibold mb-4">Grafik Monitoring pH dan TDS</h2>
+            <div className="h-[400px] w-full">
+              <Line data={chartData} options={chartOptions} />
+            </div>
+          </div>
         </div>
 
         {/* Devices Section */}
-        <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-lg p-6 mb-8`}>
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-            <h2 className={`text-xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-4 md:mb-0 flex items-center`}>
-              <span className="mr-2">🔌</span> Perangkat Terpasang
-            </h2>
-            <button
-              onClick={() => {
-                setEditingDevice(null);
-                setNewDevice({ name: '', type: 'pH', location: '' });
-                setShowDeviceModal(true);
-              }}
-              className={`px-6 py-3 rounded-full ${
-                isDarkMode ? 'bg-green-600 hover:bg-green-700' : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700'
-              } text-white transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105`}
-            >
-              + Tambah Perangkat
-            </button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {devices.map((device) => (
-              <div key={device.id} className={`${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-xl shadow-md p-6 transition-all duration-300 hover:shadow-lg transform hover:scale-[1.02]`}>
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{device.name}</h3>
-                    <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{device.location}</p>
-                  </div>
-                  <div className="flex space-x-2">
-                    <button onClick={() => handleEditDevice(device)} className="p-2 text-blue-500 hover:text-blue-600 transition-colors">
-                      ✏️
-                    </button>
-                    <button onClick={() => handleDeleteDevice(device.id)} className="p-2 text-red-500 hover:text-red-600 transition-colors">
-                      🗑️
-                    </button>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{device.type}</span>
-                  <button
-                    onClick={() => toggleDeviceStatus(device.id)}
-                    className={`px-4 py-2 rounded-full text-sm transition-all duration-300 ${
-                      device.status === 'active'
-                        ? isDarkMode
-                          ? 'bg-green-900 text-green-200 hover:bg-green-800'
-                          : 'bg-green-100 text-green-800 hover:bg-green-200'
-                        : isDarkMode
-                        ? 'bg-red-900 text-red-200 hover:bg-red-800'
-                        : 'bg-red-100 text-red-800 hover:bg-red-200'
-                    }`}
-                  >
-                    {device.status === 'active' ? '🟢 Aktif' : '🔴 Nonaktif'}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Last Update */}
-        <div className={`text-center ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-8`}>Pembaruan terakhir: {lastUpdate.toLocaleTimeString('id-ID')}</div>
-
-        {/* Notification */}
-        {showNotification && <div className="fixed bottom-4 right-4 max-w-md bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-4 rounded-xl shadow-lg animate-slide-in">⚠️ {notificationMessage}</div>}
-
-        {/* Settings Modal */}
-        {showSettingsModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-xl p-6 w-full max-w-md transform transition-all duration-300 scale-100`}>
-              <h2 className={`text-2xl font-semibold mb-6 ${isDarkMode ? 'text-white' : 'text-gray-900'} flex items-center`}>
-                <span className="mr-2">⚙️</span> Pengaturan
-              </h2>
-              <div className="space-y-6">
-                <div>
-                  <label className={`block ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>pH Minimum</label>
-                  <input
-                    type="number"
-                    value={settings.phMin}
-                    onChange={(e) => handleSettingsChange('phMin', parseFloat(e.target.value))}
-                    className={`w-full px-4 py-2 border rounded-lg ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500' : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500'} transition-all duration-300`}
-                  />
-                </div>
-                <div>
-                  <label className={`block ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>pH Maksimum</label>
-                  <input
-                    type="number"
-                    value={settings.phMax}
-                    onChange={(e) => handleSettingsChange('phMax', parseFloat(e.target.value))}
-                    className={`w-full px-4 py-2 border rounded-lg ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500' : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500'} transition-all duration-300`}
-                  />
-                </div>
-                <div>
-                  <label className={`block ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>TDS Maksimum (ppm)</label>
-                  <input
-                    type="number"
-                    value={settings.tdsMax}
-                    onChange={(e) => handleSettingsChange('tdsMax', parseInt(e.target.value))}
-                    className={`w-full px-4 py-2 border rounded-lg ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500' : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500'} transition-all duration-300`}
-                  />
-                </div>
-                <div className={`flex items-center ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} p-4 rounded-lg`}>
-                  <input
-                    type="checkbox"
-                    checked={settings.notificationSound}
-                    onChange={(e) => handleSettingsChange('notificationSound', e.target.checked)}
-                    className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 transition-all duration-300"
-                  />
-                  <label className={`ml-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Suara Notifikasi</label>
-                </div>
-                <div className={`${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} p-4 rounded-lg`}>
-                  <label className={`block ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-3`}>Auto Export</label>
-                  <div className="flex items-center space-x-4">
-                    <input type="checkbox" checked={settings.autoExport} onChange={(e) => handleSettingsChange('autoExport', e.target.checked)} className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 transition-all duration-300" />
-                    <select
-                      value={settings.exportInterval}
-                      onChange={(e) => handleSettingsChange('exportInterval', e.target.value)}
-                      className={`flex-1 px-4 py-2 border rounded-lg ${isDarkMode ? 'bg-gray-600 border-gray-500 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:ring-2 focus:ring-blue-500 transition-all duration-300`}
-                      disabled={!settings.autoExport}
-                    >
-                      <option value="daily">Harian</option>
-                      <option value="weekly">Mingguan</option>
-                      <option value="monthly">Bulanan</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-8 flex justify-end space-x-4">
-                <button
-                  onClick={() => setShowSettingsModal(false)}
-                  className={`px-6 py-2 rounded-full ${isDarkMode ? 'bg-gray-600 hover:bg-gray-500' : 'bg-gray-500 hover:bg-gray-600'} text-white transition-all duration-300 transform hover:scale-105`}
-                >
-                  Tutup
-                </button>
-                <button
-                  onClick={handleExportData}
-                  className={`px-6 py-2 rounded-full ${
-                    isDarkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700'
-                  } text-white transition-all duration-300 transform hover:scale-105`}
-                >
-                  Export Data
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Device Modal */}
-        {showDeviceModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-xl p-6 w-full max-w-md transform transition-all duration-300 scale-100`}>
-              <h2 className={`text-2xl font-semibold mb-6 ${isDarkMode ? 'text-white' : 'text-gray-900'} flex items-center`}>
-                <span className="mr-2">{editingDevice ? '✏️' : '➕'}</span>
-                {editingDevice ? 'Edit Perangkat' : 'Tambah Perangkat'}
-              </h2>
-              <div className="space-y-6">
-                <div>
-                  <label className={`block ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Nama Perangkat</label>
-                  <input
-                    type="text"
-                    value={editingDevice ? editingDevice.name : newDevice.name}
-                    onChange={(e) => (editingDevice ? setEditingDevice({ ...editingDevice, name: e.target.value }) : setNewDevice({ ...newDevice, name: e.target.value }))}
-                    className={`w-full px-4 py-2 border rounded-lg ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500' : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500'} transition-all duration-300`}
-                  />
-                </div>
-                <div>
-                  <label className={`block ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Tipe</label>
-                  <select
-                    value={editingDevice ? editingDevice.type : newDevice.type}
-                    onChange={(e) => (editingDevice ? setEditingDevice({ ...editingDevice, type: e.target.value }) : setNewDevice({ ...newDevice, type: e.target.value }))}
-                    className={`w-full px-4 py-2 border rounded-lg ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:ring-2 focus:ring-blue-500 transition-all duration-300`}
-                  >
-                    <option value="pH">pH</option>
-                    <option value="TDS">TDS</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={`block ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Lokasi</label>
-                  <input
-                    type="text"
-                    value={editingDevice ? editingDevice.location : newDevice.location}
-                    onChange={(e) => (editingDevice ? setEditingDevice({ ...editingDevice, location: e.target.value }) : setNewDevice({ ...newDevice, location: e.target.value }))}
-                    className={`w-full px-4 py-2 border rounded-lg ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500' : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500'} transition-all duration-300`}
-                  />
-                </div>
-              </div>
-              <div className="mt-8 flex justify-end space-x-4">
-                <button
-                  onClick={() => setShowDeviceModal(false)}
-                  className={`px-6 py-2 rounded-full ${isDarkMode ? 'bg-gray-600 hover:bg-gray-500' : 'bg-gray-500 hover:bg-gray-600'} text-white transition-all duration-300 transform hover:scale-105`}
-                >
-                  Batal
-                </button>
-                <button
-                  onClick={editingDevice ? handleUpdateDevice : handleAddDevice}
-                  className={`px-6 py-2 rounded-full ${
-                    isDarkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700'
-                  } text-white transition-all duration-300 transform hover:scale-105`}
-                >
-                  {editingDevice ? 'Simpan' : 'Tambah'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Delete Confirmation Modal */}
-        {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-xl p-6 w-full max-w-md transform transition-all duration-300 scale-100`}>
-              <h2 className={`text-2xl font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'} flex items-center`}>
-                <span className="mr-2">🗑️</span> Konfirmasi Hapus
-              </h2>
-              <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-6`}>Apakah Anda yakin ingin menghapus perangkat ini?</p>
-              <div className="flex justify-end space-x-4">
-                <button onClick={cancelDeleteDevice} className={`px-6 py-2 rounded-full ${isDarkMode ? 'bg-gray-600 hover:bg-gray-500' : 'bg-gray-500 hover:bg-gray-600'} text-white transition-all duration-300 transform hover:scale-105`}>
-                  Batal
-                </button>
-                <button
-                  onClick={confirmDeleteDevice}
-                  className={`px-6 py-2 rounded-full ${
-                    isDarkMode ? 'bg-red-600 hover:bg-red-700' : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700'
-                  } text-white transition-all duration-300 transform hover:scale-105`}
-                >
-                  Hapus
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <DevicesSection
+          devices={devices}
+          isDarkMode={isDarkMode}
+          onAddDevice={() => setShowDeviceModal(true)}
+          onEditDevice={handleEditDevice}
+          onDeleteDevice={(device) => {
+            setDeviceToDelete(device);
+            setShowDeleteConfirm(true);
+          }}
+          onToggleStatus={toggleDeviceStatus}
+          realTimeData={realTimeData}
+        />
       </div>
+
+      {/* Modals */}
+      <SettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} onSave={handleSaveSettings} currentSettings={settings} isDarkMode={isDarkMode} />
+
+      {showDeviceModal && (
+        <DeviceModal
+          isOpen={showDeviceModal}
+          onClose={() => {
+            setShowDeviceModal(false);
+            setEditingDevice(null);
+          }}
+          onSave={editingDevice ? handleUpdateDevice : handleAddDevice}
+          device={editingDevice || newDevice}
+          isDarkMode={isDarkMode}
+        />
+      )}
+
+      {showDeleteConfirm && (
+        <DeleteConfirmationModal
+          isOpen={showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(false)}
+          onConfirm={() => {
+            if (deviceToDelete) {
+              handleDeleteDevice(deviceToDelete);
+              setDeviceToDelete(null);
+            }
+            setShowDeleteConfirm(false);
+          }}
+          deviceName={deviceToDelete?.name || ''}
+          isDarkMode={isDarkMode}
+        />
+      )}
+
+      {/* Notification */}
+      {showNotification && (
+        <div className={`fixed bottom-4 right-4 p-4 rounded-lg shadow-lg ${isDarkMode ? 'bg-red-900 text-white' : 'bg-red-100 text-red-900'} transition-all duration-300 transform translate-y-0 opacity-100`}>{notificationMessage}</div>
+      )}
     </div>
   );
 }

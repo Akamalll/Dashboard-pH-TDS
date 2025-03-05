@@ -4,6 +4,7 @@
 #include <ESPAsyncWebServer.h>
 #include <SPIFFS.h>
 #include <ArduinoJson.h>
+#include <AsyncTCP.h>
 
 // Konfigurasi WiFi
 const char* ssid = "S21";  
@@ -178,14 +179,33 @@ void setup() {
     client.setServer(mqtt_server, mqtt_port);
     client.setCallback(callback);
 
+    // Konfigurasi CORS
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET, POST, PUT");
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type");
+
     // Konfigurasi web server
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
         request->send_P(200, "text/html", index_html);
     });
 
     server.on("/values", HTTP_GET, [](AsyncWebServerRequest *request){
-        String json = "{\"ph\":" + String(lastPH) + ",\"tds\":" + String(lastTDS) + "}";
-        request->send(200, "application/json", json);
+        float currentPH = bacaPH();
+        float currentTDS = bacaTDS();
+        
+        StaticJsonDocument<200> doc;
+        doc["ph"] = currentPH;
+        doc["tds"] = currentTDS;
+        doc["timestamp"] = millis();
+        
+        String response;
+        serializeJson(doc, response);
+        
+        request->send(200, "application/json", response);
+        
+        // Update nilai global
+        lastPH = currentPH;
+        lastTDS = currentTDS;
     });
 
     server.begin();
