@@ -117,7 +117,7 @@ function App() {
         let message = '';
         if (phValue < settings.phMin) message = 'pH Air terlalu asam!';
         else if (phValue > settings.phMax) message = 'pH Air terlalu basa!';
-        if (tdsValue > settings.tdsMax) message += message ? ' dan ' : '' + 'TDS Air terlalu tinggi!';
+        if (tdsValue > settings.tdsMax) message += (message ? ' dan ' : '') + 'TDS Air terlalu tinggi!';
         setNotificationMessage(message);
         setShowNotification(true);
 
@@ -150,7 +150,7 @@ function App() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [settings]);
+  }, [settings, handleExportData, phValue, tdsValue]);
 
   const getPhStatus = (ph) => {
     if (ph < 6.5) return { text: 'Asam', color: 'text-red-500', gradient: 'from-red-500 to-red-600' };
