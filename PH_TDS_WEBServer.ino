@@ -10,10 +10,12 @@
 const char* ssid = "S21";  
 const char* password = "p12345678q";  
 
-// Konfigurasi MQTT
-const char* mqtt_server = "broker.emqx.io";
-const int mqtt_port = 1883;
-const char* client_id = "ESP32_Client";
+// Konfigurasi MQTT EMQX Cloud
+const char* mqtt_server = "d6916faa.ala.eu-central-1.emqxsl.com";
+const int mqtt_port = 8883;
+const char* mqtt_username = "your_username_here"; // Ganti dengan username Anda
+const char* mqtt_password = "your_password_here"; // Ganti dengan password Anda
+const char* client_id = "ESP32_Sensor_Client";
 
 // Inisialisasi WiFi, MQTT Client, dan Web Server
 WiFiClient espClient;
@@ -130,8 +132,8 @@ void setup_wifi() {
 // Fungsi koneksi ke MQTT Broker
 void reconnect() {
     while (!client.connected()) {
-        Serial.print("Menghubungkan ke MQTT...");
-        if (client.connect(client_id)) {
+        Serial.print("Menghubungkan ke MQTT EMQX Cloud...");
+        if (client.connect(client_id, mqtt_username, mqtt_password)) {
             Serial.println("Terhubung!");
             // Subscribe ke topik-topik yang diperlukan
             client.subscribe("control/calibration");
